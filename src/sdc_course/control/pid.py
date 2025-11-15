@@ -114,4 +114,34 @@ class PIDLateralController:
         ######################################################################
         ################## TODO: IMPLEMENT LATERAL PID CONTROL HERE ###########
         #######################################################################
+
+        # Calculate signed cross track error
+        vehicle_location = vehicle_transform.location
+        target_waypoint = waypoints[0]  # [x, y, z]
+        forward_vec = vehicle_transform.get_forward_vector()  # carla's 3d vector
+        
+        vehicle_heading_vec = np.array([forward_vec.x, forward_vec.y])  # 2d heading
+
+        to_waypoint_vec = np.array([target_waypoint[0] - vehicle_location.x,
+                                   target_waypoint[1] - vehicle_location.y])  # vector to waypoint
+
+        error_magnitude = np.linalg.norm(to_waypoint_vec) # cross track error magnitude
+        
+        steering_direction = self._get_steering_direction(to_waypoint_vec, vehicle_heading_vec) 
+
+        signed_error = error_magnitude * steering_direction
+        self._error_buffer.append(signed_error)
+
+        # PID calculations  
+        current_error = self._error_buffer[-1]
+        integral = sum(self._error_buffer) * self._dt    # integral term
+        derivative = (self._error_buffer[-1] - self._error_buffer[-2]) / self._dt if len(self._error_buffer) >= 2 else 0.0
+
+        steering = (self._k_p * current_error) + (self._k_d * derivative) + (self._k_i * integral)
+
+        # Apply steering direction
+        # Clamp steering to valid range [-1.0, 1.0]
+        # steering = max(-1.0, min(1.0, steering))
+
         return steering
+    
