@@ -50,4 +50,41 @@ class PurePursuitLateralController:
         #######################################################################
         ################## TODO: IMPLEMENT PURE-PURSUIT CONTROL HERE ##########
         #######################################################################
+
+        # Get the vehicle states
+        vehicle_location = vehicle_transform.location
+        vehicle_velocity = get_velocity_ms(self._vehicle)
+
+        # Calculate dynamic lookahead-distance
+        lookahead_dist = max(self._min_lookahead, self._k_pp * vehicle_velocity)
+
+        # Find the goal waypoint at the lookahead distance
+        goal_wp_index = self._get_goal_waypoint_index(self._vehicle, waypoints, lookahead_dist)
+        goal_wp = waypoints[goal_wp_index]
+
+        # Get vehicle heading and goal waypoint vector with norms
+        forward_vec = vehicle_transform.get_forward_vector()  # carla's 3d vector
+        vehicle_heading_vec = np.array([forward_vec.x, forward_vec.y])  # 2d heading
+        to_waypoint_vec = np.array([goal_wp[0] - vehicle_location.x,
+                                   goal_wp[1] - vehicle_location.y])  # vector to waypoint
+        
+        norm_heading = np.linalg.norm(vehicle_heading_vec)
+        norm_to_wp = np.linalg.norm(to_waypoint_vec) 
+
+        # Calculate the angle alpha between vehicle heading and waypoint vector
+        if norm_heading == 0 or norm_to_wp == 0:
+            alpha = 0.0
+        else:
+            cos_alpha = np.dot(vehicle_heading_vec, to_waypoint_vec) / (norm_heading * norm_to_wp)
+            cos_alpha = np.clip(cos_alpha, -1.0, 1.0)
+            alpha = np.arccos(cos_alpha)
+
+        # Pure Pursuit steering control law
+        # steering = atan2(2 * L * sin(alpha), lookahead_dist)
+        steering = np.arctan2(2 * self._L * np.sin(alpha), lookahead_dist)
+
+        # Apply steering direction
+        steering_direction = self._get_steering_direction(to_waypoint_vec, vehicle_heading_vec) 
+        steering *= steering_direction
+
         return steering
